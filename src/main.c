@@ -120,6 +120,14 @@ int get_instruction_size(char *tokens[], int token_count) {
     else if (strcasecmp(tokens[0], "mul") == 0) return 1;
     else if (strcasecmp(tokens[0], "div") == 0) return 1;
     else if (strcasecmp(tokens[0], "mod") == 0) return 1;
+    // Bitwise
+    else if (strcasecmp(tokens[0], "and") == 0) return 1;
+    else if (strcasecmp(tokens[0], "or") == 0) return 1;
+    else if (strcasecmp(tokens[0], "xor") == 0) return 1;
+    else if (strcasecmp(tokens[0], "not") == 0) return 1;
+    else if (strcasecmp(tokens[0], "shl") == 0) return 1;
+    else if (strcasecmp(tokens[0], "shr") == 0) return 1;
+    else if (strcasecmp(tokens[0], "sar") == 0) return 1;
     // Comparisons
     else if (strcasecmp(tokens[0], "cmp") == 0) return 1;
     else if (strcasecmp(tokens[0], "eq") == 0) return 1;
@@ -132,11 +140,17 @@ int get_instruction_size(char *tokens[], int token_count) {
     else if (strcasecmp(tokens[0], "jnz") == 0) return 5;    // JNZ32: 1 + 4
     else if (strcasecmp(tokens[0], "call") == 0) return 5;   // CALL32: 1 + 4
     else if (strcasecmp(tokens[0], "ret") == 0) return 1;
+    else if (strcasecmp(tokens[0], "enter") == 0 && token_count >= 2) return 2; // ENTER: 1 + 1 byte locals
+    else if (strcasecmp(tokens[0], "leave") == 0) return 1;
     // Memory
     else if (strcasecmp(tokens[0], "load") == 0) return 2;   // 1 + 1 byte index
     else if (strcasecmp(tokens[0], "store") == 0) return 2;  // 1 + 1 byte index
-    else if (strcasecmp(tokens[0], "load_abs") == 0) return 1; // LOAD_ABS: 1 byte
-    else if (strcasecmp(tokens[0], "store_abs") == 0) return 1; // STORE_ABS: 1 byte
+    else if (strcasecmp(tokens[0], "load_rel") == 0 && token_count >= 2) return 2; // 1 + 1 byte offset
+    else if (strcasecmp(tokens[0], "store_rel") == 0 && token_count >= 2) return 2; // 1 + 1 byte offset
+    else if (strcasecmp(tokens[0], "load_arg") == 0 && token_count >= 2) return 2; // 1 + 1 byte offset
+    else if (strcasecmp(tokens[0], "store_arg") == 0 && token_count >= 2) return 2; // 1 + 1 byte offset
+    else if (strcasecmp(tokens[0], "load_abs") == 0) return 1;
+    else if (strcasecmp(tokens[0], "store_abs") == 0) return 1;
     // System calls
     else if (strcasecmp(tokens[0], "syscall") == 0) return 2; // 1 + 1 byte syscall ID
     else if (strcasecmp(tokens[0], "break") == 0) return 1;
@@ -326,6 +340,35 @@ int main(int argc, char *argv[]) {
             fputc(0x14, output);
             current_address += 1;
         }
+        // Bitwise operations
+        else if (strcasecmp(tokens[0], "and") == 0) {
+            fputc(0x60, output);
+            current_address += 1;
+        }
+        else if (strcasecmp(tokens[0], "or") == 0) {
+            fputc(0x61, output);
+            current_address += 1;
+        }
+        else if (strcasecmp(tokens[0], "xor") == 0) {
+            fputc(0x62, output);
+            current_address += 1;
+        }
+        else if (strcasecmp(tokens[0], "not") == 0) {
+            fputc(0x63, output);
+            current_address += 1;
+        }
+        else if (strcasecmp(tokens[0], "shl") == 0) {
+            fputc(0x64, output);
+            current_address += 1;
+        }
+        else if (strcasecmp(tokens[0], "shr") == 0) {
+            fputc(0x65, output);
+            current_address += 1;
+        }
+        else if (strcasecmp(tokens[0], "sar") == 0) {
+            fputc(0x66, output);
+            current_address += 1;
+        }
         // Comparisons
         else if (strcasecmp(tokens[0], "cmp") == 0) {
             fputc(0x20, output);
@@ -396,7 +439,17 @@ int main(int argc, char *argv[]) {
             fputc(0x34, output);
             current_address += 1;
         }
-        // Memory
+        else if (strcasecmp(tokens[0], "enter") == 0 && token_count >= 2) {
+            fputc(0x35, output); // ENTER
+            uint8_t locals = (uint8_t)parse_number(tokens[1]);
+            fputc(locals, output);
+            current_address += 2;
+        }
+        else if (strcasecmp(tokens[0], "leave") == 0) {
+            fputc(0x36, output); // LEAVE
+            current_address += 1;
+        }
+        // Memory - locals
         else if (strcasecmp(tokens[0], "load") == 0 && token_count >= 2) {
             fputc(0x40, output);
             uint8_t var_index = (uint8_t)parse_number(tokens[1]);
@@ -409,7 +462,33 @@ int main(int argc, char *argv[]) {
             fputc(var_index, output);
             current_address += 2;
         }
-        // New absolute memory access instructions
+        // Memory - relative to fp
+        else if (strcasecmp(tokens[0], "load_rel") == 0 && token_count >= 2) {
+            fputc(0x42, output);
+            uint8_t offset = (uint8_t)parse_number(tokens[1]);
+            fputc(offset, output);
+            current_address += 2;
+        }
+        else if (strcasecmp(tokens[0], "store_rel") == 0 && token_count >= 2) {
+            fputc(0x43, output);
+            uint8_t offset = (uint8_t)parse_number(tokens[1]);
+            fputc(offset, output);
+            current_address += 2;
+        }
+        // Memory - arguments
+        else if (strcasecmp(tokens[0], "load_arg") == 0 && token_count >= 2) {
+            fputc(0x37, output);
+            uint8_t offset = (uint8_t)parse_number(tokens[1]);
+            fputc(offset, output);
+            current_address += 2;
+        }
+        else if (strcasecmp(tokens[0], "store_arg") == 0 && token_count >= 2) {
+            fputc(0x38, output);
+            uint8_t offset = (uint8_t)parse_number(tokens[1]);
+            fputc(offset, output);
+            current_address += 2;
+        }
+        // Absolute memory access
         else if (strcasecmp(tokens[0], "load_abs") == 0) {
             fputc(0x44, output); // LOAD_ABS opcode
             current_address += 1;
