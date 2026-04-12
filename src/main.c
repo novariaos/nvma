@@ -5,28 +5,24 @@
 #include <errno.h>
 #include <stdint.h>
 
-// Syscall table
+// Syscall table - ТОЧНО соответствует syscalls.c
 typedef struct {
     const char *name;
     int number;
 } Syscall;
 
 Syscall syscalls[] = {
-    {"exit", 0x00},
-    {"spawn", 0x01},
-    {"open", 0x02},
-    {"read", 0x03},
-    {"write", 0x04},
-    {"create", 0x05},
-    {"delete", 0x06},
-    {"cap_request", 0x07},
-    {"cap_spawn", 0x08},
-    {"drv_call", 0x09},
-    {"msg_send", 0x0A},
-    {"msg_recieve", 0x0B},
-    {"inb", 0x0C},
-    {"outb", 0x0D},
-    {"print", 0x0E},
+    {"exit", 0x00},           // SYS_EXIT
+    {"spawn", 0x01},          // SYS_SPAWN
+    {"open", 0x02},           // SYS_OPEN
+    {"read", 0x03},           // SYS_READ
+    {"write", 0x04},          // SYS_WRITE
+    {"delete", 0x06},         // SYS_DELETE (note: 0x05 is missing in NVM)
+    {"msg_send", 0x0A},       // SYS_MSG_SEND
+    {"msg_receive", 0x0B},    // SYS_MSG_RECEIVE (fixed spelling)
+    {"inb", 0x0C},            // SYS_PORT_IN_BYTE
+    {"outb", 0x0D},           // SYS_PORT_OUT_BYTE
+    {"print", 0x0E},          // SYS_PRINT (deprecated but present)
     {NULL, 0}
 };
 
@@ -110,7 +106,7 @@ int get_instruction_size(char *tokens[], int token_count) {
     if (strcasecmp(tokens[0], ".NVM0") == 0) return 0;
     else if (strcasecmp(tokens[0], "hlt") == 0 || strcasecmp(tokens[0], "halt") == 0) return 1;
     else if (strcasecmp(tokens[0], "nop") == 0) return 1;
-    else if (strcasecmp(tokens[0], "push") == 0 && token_count >= 2) return 5; // PUSH32: 1 byte opcode + 4 bytes value
+    else if (strcasecmp(tokens[0], "push") == 0 && token_count >= 2) return 5;
     else if (strcasecmp(tokens[0], "pop") == 0) return 1;
     else if (strcasecmp(tokens[0], "dup") == 0) return 1;
     else if (strcasecmp(tokens[0], "swap") == 0) return 1;
@@ -134,25 +130,27 @@ int get_instruction_size(char *tokens[], int token_count) {
     else if (strcasecmp(tokens[0], "neq") == 0) return 1;
     else if (strcasecmp(tokens[0], "gt") == 0) return 1;
     else if (strcasecmp(tokens[0], "lt") == 0) return 1;
-    // Flow control (32-bit)
-    else if (strcasecmp(tokens[0], "jmp") == 0) return 5;    // JMP32: 1 + 4
-    else if (strcasecmp(tokens[0], "jz") == 0) return 5;     // JZ32: 1 + 4
-    else if (strcasecmp(tokens[0], "jnz") == 0) return 5;    // JNZ32: 1 + 4
-    else if (strcasecmp(tokens[0], "call") == 0) return 5;   // CALL32: 1 + 4
+    // Flow control
+    else if (strcasecmp(tokens[0], "jmp") == 0) return 5;
+    else if (strcasecmp(tokens[0], "jz") == 0) return 5;
+    else if (strcasecmp(tokens[0], "jnz") == 0) return 5;
+    else if (strcasecmp(tokens[0], "call") == 0) return 5;
     else if (strcasecmp(tokens[0], "ret") == 0) return 1;
-    else if (strcasecmp(tokens[0], "enter") == 0 && token_count >= 2) return 2; // ENTER: 1 + 1 byte locals
+    else if (strcasecmp(tokens[0], "enter") == 0 && token_count >= 2) return 2;
     else if (strcasecmp(tokens[0], "leave") == 0) return 1;
+    else if (strcasecmp(tokens[0], "load_arg") == 0 && token_count >= 2) return 2;
+    else if (strcasecmp(tokens[0], "store_arg") == 0 && token_count >= 2) return 2;
     // Memory
-    else if (strcasecmp(tokens[0], "load") == 0) return 2;   // 1 + 1 byte index
-    else if (strcasecmp(tokens[0], "store") == 0) return 2;  // 1 + 1 byte index
-    else if (strcasecmp(tokens[0], "load_rel") == 0 && token_count >= 2) return 2; // 1 + 1 byte offset
-    else if (strcasecmp(tokens[0], "store_rel") == 0 && token_count >= 2) return 2; // 1 + 1 byte offset
-    else if (strcasecmp(tokens[0], "load_arg") == 0 && token_count >= 2) return 2; // 1 + 1 byte offset
-    else if (strcasecmp(tokens[0], "store_arg") == 0 && token_count >= 2) return 2; // 1 + 1 byte offset
+    else if (strcasecmp(tokens[0], "load") == 0) return 2;
+    else if (strcasecmp(tokens[0], "store") == 0) return 2;
+    else if (strcasecmp(tokens[0], "load_rel") == 0 && token_count >= 2) return 2;
+    else if (strcasecmp(tokens[0], "store_rel") == 0 && token_count >= 2) return 2;
     else if (strcasecmp(tokens[0], "load_abs") == 0) return 1;
     else if (strcasecmp(tokens[0], "store_abs") == 0) return 1;
-    // System calls
-    else if (strcasecmp(tokens[0], "syscall") == 0) return 2; // 1 + 1 byte syscall ID
+    else if (strcasecmp(tokens[0], "load_heap") == 0) return 1;
+    else if (strcasecmp(tokens[0], "store_heap") == 0) return 1;
+    // System
+    else if (strcasecmp(tokens[0], "syscall") == 0) return 2;
     else if (strcasecmp(tokens[0], "break") == 0) return 1;
     
     return 0;
@@ -271,7 +269,7 @@ int main(int argc, char *argv[]) {
         
         if (strlen(start) == 0) continue;
         
-        // Skip labels in second pass (they don't generate code)
+        // Skip labels in second pass
         if (start[strlen(start) - 1] == ':') {
             continue;
         }
@@ -286,113 +284,110 @@ int main(int argc, char *argv[]) {
             token = strtok(NULL, " \t,");
         }
         
-        // Process instructions
+        // Process instructions - ОПКОДЫ ТОЧНО СООТВЕТСТВУЮТ nvm.c
         if (strcasecmp(tokens[0], ".NVM0") == 0) {
-            // Already handled - signature
+            // Already handled
         }
         else if (strcasecmp(tokens[0], "hlt") == 0 || strcasecmp(tokens[0], "halt") == 0) {
-            fputc(0x00, output);
+            fputc(0x00, output);  // HALT
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "nop") == 0) {
-            fputc(0x01, output);
+            fputc(0x01, output);  // NOP
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "push") == 0 && token_count >= 2) {
-            fputc(0x02, output); // PUSH32 opcode
+            fputc(0x02, output);  // PUSH
             uint32_t value = parse_number(tokens[1]);
             write_32bit_value(output, value);
             current_address += 5;
-            
-            // Debug output
-            printf("DEBUG: PUSH32 0x%08X (%d) at address %d\n", value, value, current_address - 5);
         }
         else if (strcasecmp(tokens[0], "pop") == 0) {
-            fputc(0x04, output);
+            fputc(0x04, output);  // POP
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "dup") == 0) {
-            fputc(0x05, output);
+            fputc(0x05, output);  // DUP
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "swap") == 0) {
-            fputc(0x06, output);
+            fputc(0x06, output);  // SWAP
             current_address += 1;
         }
         // Arithmetic
         else if (strcasecmp(tokens[0], "add") == 0) {
-            fputc(0x10, output);
+            fputc(0x10, output);  // ADD
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "sub") == 0) {
-            fputc(0x11, output);
+            fputc(0x11, output);  // SUB
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "mul") == 0) {
-            fputc(0x12, output);
+            fputc(0x12, output);  // MUL
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "div") == 0) {
-            fputc(0x13, output);
+            fputc(0x13, output);  // DIV
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "mod") == 0) {
-            fputc(0x14, output);
+            fputc(0x14, output);  // MOD
             current_address += 1;
         }
-        // Bitwise operations
+        // Bitwise
         else if (strcasecmp(tokens[0], "and") == 0) {
-            fputc(0x60, output);
+            fputc(0x60, output);  // AND
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "or") == 0) {
-            fputc(0x61, output);
+            fputc(0x61, output);  // OR
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "xor") == 0) {
-            fputc(0x62, output);
+            fputc(0x62, output);  // XOR
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "not") == 0) {
-            fputc(0x63, output);
+            fputc(0x63, output);  // NOT
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "shl") == 0) {
-            fputc(0x64, output);
+            fputc(0x64, output);  // SHL
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "shr") == 0) {
-            fputc(0x65, output);
+            fputc(0x65, output);  // SHR
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "sar") == 0) {
-            fputc(0x66, output);
+            fputc(0x66, output);  // SAR
             current_address += 1;
         }
         // Comparisons
         else if (strcasecmp(tokens[0], "cmp") == 0) {
-            fputc(0x20, output);
+            fputc(0x20, output);  // CMP
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "eq") == 0) {
-            fputc(0x21, output);
+            fputc(0x21, output);  // EQ
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "neq") == 0) {
-            fputc(0x22, output);
+            fputc(0x22, output);  // NEQ
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "gt") == 0) {
-            fputc(0x23, output);
+            fputc(0x23, output);  // GT
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "lt") == 0) {
-            fputc(0x24, output);
+            fputc(0x24, output);  // LT
             current_address += 1;
         }
-        // Flow control (32-bit)
+        // Flow control
         else if (strcasecmp(tokens[0], "jmp") == 0 && token_count >= 2) {
-            fputc(0x30, output); // JMP32
+            fputc(0x30, output);  // JMP
             uint32_t addr;
             if (find_label(tokens[1], &addr)) {
                 write_32bit_value(output, addr);
@@ -403,7 +398,7 @@ int main(int argc, char *argv[]) {
             current_address += 5;
         }
         else if (strcasecmp(tokens[0], "jz") == 0 && token_count >= 2) {
-            fputc(0x31, output); // JZ32
+            fputc(0x31, output);  // JZ
             uint32_t addr;
             if (find_label(tokens[1], &addr)) {
                 write_32bit_value(output, addr);
@@ -414,7 +409,7 @@ int main(int argc, char *argv[]) {
             current_address += 5;
         }
         else if (strcasecmp(tokens[0], "jnz") == 0 && token_count >= 2) {
-            fputc(0x32, output); // JNZ32
+            fputc(0x32, output);  // JNZ
             uint32_t addr;
             if (find_label(tokens[1], &addr)) {
                 write_32bit_value(output, addr);
@@ -425,7 +420,7 @@ int main(int argc, char *argv[]) {
             current_address += 5;
         }
         else if (strcasecmp(tokens[0], "call") == 0 && token_count >= 2) {
-            fputc(0x33, output); // CALL32
+            fputc(0x33, output);  // CALL
             uint32_t addr;
             if (find_label(tokens[1], &addr)) {
                 write_32bit_value(output, addr);
@@ -436,79 +431,85 @@ int main(int argc, char *argv[]) {
             current_address += 5;
         }
         else if (strcasecmp(tokens[0], "ret") == 0) {
-            fputc(0x34, output);
+            fputc(0x34, output);  // RET
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "enter") == 0 && token_count >= 2) {
-            fputc(0x35, output); // ENTER
+            fputc(0x35, output);  // ENTER
             uint8_t locals = (uint8_t)parse_number(tokens[1]);
             fputc(locals, output);
             current_address += 2;
         }
         else if (strcasecmp(tokens[0], "leave") == 0) {
-            fputc(0x36, output); // LEAVE
+            fputc(0x36, output);  // LEAVE
             current_address += 1;
         }
-        // Memory - locals
-        else if (strcasecmp(tokens[0], "load") == 0 && token_count >= 2) {
-            fputc(0x40, output);
-            uint8_t var_index = (uint8_t)parse_number(tokens[1]);
-            fputc(var_index, output);
-            current_address += 2;
-        }
-        else if (strcasecmp(tokens[0], "store") == 0 && token_count >= 2) {
-            fputc(0x41, output);
-            uint8_t var_index = (uint8_t)parse_number(tokens[1]);
-            fputc(var_index, output);
-            current_address += 2;
-        }
-        // Memory - relative to fp
-        else if (strcasecmp(tokens[0], "load_rel") == 0 && token_count >= 2) {
-            fputc(0x42, output);
-            uint8_t offset = (uint8_t)parse_number(tokens[1]);
-            fputc(offset, output);
-            current_address += 2;
-        }
-        else if (strcasecmp(tokens[0], "store_rel") == 0 && token_count >= 2) {
-            fputc(0x43, output);
-            uint8_t offset = (uint8_t)parse_number(tokens[1]);
-            fputc(offset, output);
-            current_address += 2;
-        }
-        // Memory - arguments
         else if (strcasecmp(tokens[0], "load_arg") == 0 && token_count >= 2) {
-            fputc(0x37, output);
+            fputc(0x37, output);  // LOAD_ARG
             uint8_t offset = (uint8_t)parse_number(tokens[1]);
             fputc(offset, output);
             current_address += 2;
         }
         else if (strcasecmp(tokens[0], "store_arg") == 0 && token_count >= 2) {
-            fputc(0x38, output);
+            fputc(0x38, output);  // STORE_ARG
             uint8_t offset = (uint8_t)parse_number(tokens[1]);
             fputc(offset, output);
             current_address += 2;
         }
-        // Absolute memory access
+        // Memory
+        else if (strcasecmp(tokens[0], "load") == 0 && token_count >= 2) {
+            fputc(0x40, output);  // LOAD
+            uint8_t var_index = (uint8_t)parse_number(tokens[1]);
+            fputc(var_index, output);
+            current_address += 2;
+        }
+        else if (strcasecmp(tokens[0], "store") == 0 && token_count >= 2) {
+            fputc(0x41, output);  // STORE
+            uint8_t var_index = (uint8_t)parse_number(tokens[1]);
+            fputc(var_index, output);
+            current_address += 2;
+        }
+        else if (strcasecmp(tokens[0], "load_rel") == 0 && token_count >= 2) {
+            fputc(0x42, output);  // LOAD_REL
+            uint8_t offset = (uint8_t)parse_number(tokens[1]);
+            fputc(offset, output);
+            current_address += 2;
+        }
+        else if (strcasecmp(tokens[0], "store_rel") == 0 && token_count >= 2) {
+            fputc(0x43, output);  // STORE_REL
+            uint8_t offset = (uint8_t)parse_number(tokens[1]);
+            fputc(offset, output);
+            current_address += 2;
+        }
         else if (strcasecmp(tokens[0], "load_abs") == 0) {
-            fputc(0x44, output); // LOAD_ABS opcode
+            fputc(0x44, output);  // LOAD_ABS
             current_address += 1;
         }
         else if (strcasecmp(tokens[0], "store_abs") == 0) {
-            fputc(0x45, output); // STORE_ABS opcode
+            fputc(0x45, output);  // STORE_ABS
             current_address += 1;
         }
-        // System calls
+        else if (strcasecmp(tokens[0], "load_heap") == 0) {
+            fputc(0x46, output);  // LOAD_HEAP
+            current_address += 1;
+        }
+        else if (strcasecmp(tokens[0], "store_heap") == 0) {
+            fputc(0x47, output);  // STORE_HEAP
+            current_address += 1;
+        }
+        // System
         else if (strcasecmp(tokens[0], "syscall") == 0 && token_count >= 2) {
-            fputc(0x50, output);
+            fputc(0x50, output);  // SYSCALL
             int syscall_num = find_syscall(tokens[1]);
             if (syscall_num == -1) {
+                printf("Warning at line %d: Unknown syscall '%s'\n", line_num, tokens[1]);
                 syscall_num = (int)parse_number(tokens[1]);
             }
             fputc(syscall_num & 0xFF, output);
             current_address += 2;
         }
         else if (strcasecmp(tokens[0], "break") == 0) {
-            fputc(0x51, output);
+            fputc(0x51, output);  // BREAK
             current_address += 1;
         }
         else {
