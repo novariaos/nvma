@@ -11,17 +11,27 @@ typedef struct {
 } Syscall;
 
 Syscall syscalls[] = {
-    {"exit", 0x00},
-    {"spawn", 0x01},
-    {"open", 0x02},
-    {"read", 0x03},
-    {"write", 0x04},
-    {"delete", 0x06},
-    {"msg_send", 0x0A},
-    {"msg_receive", 0x0B},
-    {"inb", 0x0C},
-    {"outb", 0x0D},
-    {"print", 0x0E},
+    // Process Management
+    {"exit",        0x00},
+    {"spawn",       0x01},
+    {"cap_spawn",   0x02},
+    {"sleep",       0x03},
+    
+    // Files
+    {"open",        0x10},
+    {"close",       0x11},
+    {"read",        0x12},
+    {"write",       0x13},
+    {"mkdir",       0x14},
+    {"remove",      0x15},
+    {"dup2",        0x16},
+    
+    // Memory
+    {"sbrk",        0x20},
+    
+    // Synchronization
+    {"await",       0x30},
+    
     {NULL, 0}
 };
 
